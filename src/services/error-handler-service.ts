@@ -20,7 +20,7 @@ export class ErrorHandlerService implements Service {
                 } catch (e) {
                     console.error(`Error parsing request properties: ${e}`);
                 }
-                const { formattedValue, mimeType, statusCode } = formatter.format(err, format);
+                const { formattedValue, mimeType, statusCode } = formatter.format(new Error(err.toString), format);
                 res.setHeader("Content-Type", mimeType);
                 res.status(statusCode || 500).send(formattedValue);
             } catch (e2) {
@@ -30,12 +30,14 @@ export class ErrorHandlerService implements Service {
             }
         };
 
-        app.use((err: any, req: Request, res: Response) => {
-            pipeError(err, req, res);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        app.use((req: Request, res: Response, next: any) => {
+            pipeError(new Error('Not found'), req, res);
         });
 
-        app.use((req: Request, res: Response) => {
-            pipeError(new Error("Not found"), req, res);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        app.use((err: any, req: Request, res: Response, next: any) => {
+            pipeError(err, req, res);
         });
     }
 }
