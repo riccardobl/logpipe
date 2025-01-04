@@ -1,7 +1,5 @@
-import sqlite3 from 'sqlite3';
-import { Log, LogFilter, LogStash } from '../logstash.js';
-
-
+import sqlite3 from "sqlite3";
+import { Log, LogFilter, LogStash } from "../logstash.js";
 
 export class SQLiteStash extends LogStash {
     private readonly db: sqlite3.Database;
@@ -42,7 +40,7 @@ export class SQLiteStash extends LogStash {
         });
     }
 
-     protected override async onAdd(log: Log, maxLogs:number): Promise<number> {
+    protected override async onAdd(log: Log, maxLogs: number): Promise<number> {
         if (maxLogs > 0) {
             const deleteLogsQuery = `
                 DELETE FROM ${this.tableName}
@@ -87,19 +85,15 @@ export class SQLiteStash extends LogStash {
             VALUES (?, ?, ?, ?, ?);
         `;
 
-        const id:number = await new Promise<number>((resolve, reject) => {
-            this.db.run(
-                insertLogQuery,
-                [log.logger, log.level, log.message, JSON.stringify(log.tags), log.createdAt],
-                function (err) {
-                    if (err) {
-                        console.error(`Error inserting log: ${err.message}`);
-                        reject(err);
-                    } else {
-                        resolve(this.lastID);
-                    }
+        const id: number = await new Promise<number>((resolve, reject) => {
+            this.db.run(insertLogQuery, [log.logger, log.level, log.message, JSON.stringify(log.tags), log.createdAt], function (err) {
+                if (err) {
+                    console.error(`Error inserting log: ${err.message}`);
+                    reject(err);
+                } else {
+                    resolve(this.lastID);
                 }
-            );
+            });
         });
 
         return id;
@@ -111,7 +105,7 @@ export class SQLiteStash extends LogStash {
 
         if (filter.tags?.length) {
             conditions.push(`tags LIKE ?`);
-            values.push(`%${filter.tags.join('%')}%`);
+            values.push(`%${filter.tags.join("%")}%`);
         }
 
         if (filter.from) {
@@ -129,7 +123,7 @@ export class SQLiteStash extends LogStash {
             values.push(filter.afterId);
         }
 
-        const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+        const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
         const limitClause = `LIMIT ?`;
         const query = `
             SELECT * FROM ${this.tableName}
@@ -145,12 +139,10 @@ export class SQLiteStash extends LogStash {
                     console.error(`Error querying logs: ${err.message}`);
                     reject(err);
                 } else {
-                    const logs = rows.map((row:any) =>
-                        Log.from({ ...row, tags: JSON.parse(row.tags || '[]') })
-                    );
+                    const logs = rows.map((row: any) => Log.from({ ...row, tags: JSON.parse(row.tags || "[]") }));
                     resolve(logs.reverse());
                 }
             });
         });
-    }    
+    }
 }

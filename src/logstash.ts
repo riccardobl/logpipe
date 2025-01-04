@@ -7,15 +7,14 @@ export abstract class LogStash {
     private logListeners: Array<(log: Log) => void> = [];
     private initialized?: Promise<boolean>;
 
-    
     /**
      * Called when the stash is initialized
      */
-    protected abstract onInitialize(): Promise<void>  
+    protected abstract onInitialize(): Promise<void>;
 
     /**
      * Called when logs are requested
-     * @param filter 
+     * @param filter
      */
     protected abstract onGet(filter: LogFilter): Promise<Log[]>;
 
@@ -27,7 +26,6 @@ export abstract class LogStash {
      */
     protected abstract onAdd(log: Log, maxLogs: number): Promise<number>;
 
-    
     /**
      * Set the maximum number of logs to store
      * @param maxLogs - The maximum number of logs to store
@@ -36,21 +34,21 @@ export abstract class LogStash {
         this.maxLogs = maxLogs;
     }
 
-    private async initialize(){
-        if(this.initialized && await this.initialized) return;
-        this.initialized = new Promise(async (resolve, reject) => {
-            try {
-                await this.onInitialize();
-                resolve(true);
-            } catch (err) {
-                console.error(`Error initializing logstash: ${err}`);
-                resolve(false);
-            }
+    private async initialize() {
+        if (this.initialized && (await this.initialized)) return;
+        this.initialized = new Promise((resolve) => {
+            this.onInitialize()
+                .then(() => {
+                    resolve(true);
+                })
+                .catch((err) => {
+                    console.error(`Error initializing logstash: ${err}`);
+                    resolve(false);
+                });
         });
-        await this.initialized;       
+        await this.initialized;
     }
- 
-    
+
     /**
      * Add a log to the store
      * @param log - The log to add
@@ -58,11 +56,10 @@ export abstract class LogStash {
     public async addLog(log: Log): Promise<Log> {
         await this.initialize();
         const id = await this.onAdd(log, this.maxLogs);
-        const newLog =  Log.from({...log.toJSON(), id});
-        this.logListeners.forEach(listener => listener(newLog));
-        return newLog
+        const newLog = Log.from({ ...log.toJSON(), id });
+        this.logListeners.forEach((listener) => listener(newLog));
+        return newLog;
     }
-
 
     /**
      * Get stored logs based on the filter
@@ -81,9 +78,7 @@ export abstract class LogStash {
         this.logListeners = this.logListeners.filter((l) => l !== listener);
     }
 
-   
-
-     /**
+    /**
      * Get stored logs as a stream
      * @param filter - The filter to apply
      */
@@ -143,13 +138,12 @@ export abstract class LogStash {
     }
 }
 
-
-export type LogFilter = { 
-    tags?: string[], 
-    from?: Date, 
-    to?: Date, 
-    limit?: number, 
-    afterId?:number
+export type LogFilter = {
+    tags?: string[];
+    from?: Date;
+    to?: Date;
+    limit?: number;
+    afterId?: number;
 };
 
 export class Log {
@@ -168,7 +162,6 @@ export class Log {
         this.tags = tags;
         this.id = id;
     }
-    
 
     toJSON() {
         return {
@@ -177,8 +170,8 @@ export class Log {
             message: this.message,
             createdAt: this.createdAt,
             tags: this.tags,
-            id: this.id
-        }
+            id: this.id,
+        };
     }
 
     static from(data: any) {
@@ -188,14 +181,12 @@ export class Log {
         const createdAt = new Date(data.createdAt || 0);
         const tags = Array.isArray(data.tags) ? data.tags.map((tag: any) => String(tag)) : [String(data.tags)];
         const id = data.id;
-        if(!logger) throw new Error('missing required field: logger');
-        if(!level) throw new Error('missing required field: level');
-        if(!message) throw new Error('missing required field: message');
-        if(!createdAt) throw new Error('missing required field: createdAt');
-        if(!tags) throw new Error('missing required field: tags');
-        
+        if (!logger) throw new Error("missing required field: logger");
+        if (!level) throw new Error("missing required field: level");
+        if (!message) throw new Error("missing required field: message");
+        if (!createdAt) throw new Error("missing required field: createdAt");
+        if (!tags) throw new Error("missing required field: tags");
+
         return new Log(logger, level, message, createdAt, tags, id);
     }
-
 }
-
