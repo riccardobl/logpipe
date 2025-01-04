@@ -23,7 +23,7 @@ export class PostgresStash extends LogStash {
                 level TEXT NOT NULL,
                 message TEXT NOT NULL,
                 tags TEXT[],
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );             
         `);
         console.log("Database schema initialized.");
@@ -41,7 +41,7 @@ export class PostgresStash extends LogStash {
                         SELECT id
                         FROM ${this.tableName}
                         WHERE logger = $1
-                        ORDER BY created_at ASC
+                        ORDER BY createdAt ASC
                         LIMIT $2
                     )
                 `,
@@ -51,11 +51,11 @@ export class PostgresStash extends LogStash {
         }
         const result: QueryResult = await this.client.query(
             `
-            INSERT INTO ${this.tableName} (logger, message, tags, created_at, level)
+            INSERT INTO ${this.tableName} (logger, message, tags, createdAt, level)
             VALUES ($1, $2, $3, $4, $5)
             RETURNING id
         `,
-            [log.logger, log.message, log.tags, log.createdAt, log.level],
+            [log.logger, log.message, log.tags, log.createdAt.toISOString(), log.level],
         );
         return result.rows[0].id;
     }
@@ -70,12 +70,12 @@ export class PostgresStash extends LogStash {
         }
 
         if (from) {
-            conditions.push(`created_at >= $${conditions.length + 1}`);
+            conditions.push(`createdAt >= $${conditions.length + 1}`);
             values.push(from);
         }
 
         if (to) {
-            conditions.push(`created_at <= $${conditions.length + 1}`);
+            conditions.push(`createdAt <= $${conditions.length + 1}`);
             values.push(to);
         }
 
@@ -87,7 +87,7 @@ export class PostgresStash extends LogStash {
         const query = `
             SELECT * FROM ${this.tableName}
             ${conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : ""}
-            ORDER BY created_at DESC
+            ORDER BY createdAt DESC
             LIMIT $${conditions.length + 1}
         `;
         values.push(limit);

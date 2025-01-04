@@ -178,7 +178,18 @@ export class Log {
         const logger = String(data.logger);
         const level = String(data.level);
         const message = String(data.message);
-        const createdAt = new Date(data.createdAt || 0);
+        
+        let createdAt = data.createdAt;
+        if(typeof createdAt === 'number'){
+            if(createdAt > 10000000000) {
+                createdAt = new Date(createdAt);
+            } else {
+                createdAt = new Date(createdAt * 1000)
+            }
+        }else{
+            createdAt = new Date(createdAt||0);
+        }
+        
         const tags = Array.isArray(data.tags) ? data.tags.map((tag: any) => String(tag)) : [String(data.tags)];
         const id = data.id;
         if (!logger) throw new Error("missing required field: logger");

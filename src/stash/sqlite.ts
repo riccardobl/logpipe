@@ -24,7 +24,7 @@ export class SQLiteStash extends LogStash {
                 level TEXT NOT NULL,
                 message TEXT NOT NULL,
                 tags TEXT,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
             );
         `;
 
@@ -47,7 +47,7 @@ export class SQLiteStash extends LogStash {
                 WHERE id IN (
                     SELECT id FROM ${this.tableName}
                     WHERE logger = ?
-                    ORDER BY created_at ASC
+                    ORDER BY createdAt ASC
                     LIMIT ?
                 );
             `;
@@ -81,12 +81,12 @@ export class SQLiteStash extends LogStash {
         }
 
         const insertLogQuery = `
-            INSERT INTO ${this.tableName} (logger, level, message, tags, created_at)
+            INSERT INTO ${this.tableName} (logger, level, message, tags, createdAt)
             VALUES (?, ?, ?, ?, ?);
         `;
 
         const id: number = await new Promise<number>((resolve, reject) => {
-            this.db.run(insertLogQuery, [log.logger, log.level, log.message, JSON.stringify(log.tags), log.createdAt], function (err) {
+            this.db.run(insertLogQuery, [log.logger, log.level, log.message, JSON.stringify(log.tags), log.createdAt.toISOString()], function (err) {
                 if (err) {
                     console.error(`Error inserting log: ${err.message}`);
                     reject(err);
@@ -109,12 +109,12 @@ export class SQLiteStash extends LogStash {
         }
 
         if (filter.from) {
-            conditions.push(`created_at >= ?`);
+            conditions.push(`createdAt >= ?`);
             values.push(filter.from);
         }
 
         if (filter.to) {
-            conditions.push(`created_at <= ?`);
+            conditions.push(`createdAt <= ?`);
             values.push(filter.to);
         }
 
@@ -128,7 +128,7 @@ export class SQLiteStash extends LogStash {
         const query = `
             SELECT * FROM ${this.tableName}
             ${whereClause}
-            ORDER BY created_at DESC
+            ORDER BY createdAt DESC
             ${limitClause};
         `;
         values.push(filter.limit || 1000);
