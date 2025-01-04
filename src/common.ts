@@ -1,5 +1,7 @@
 import { PostgresStash } from './stash/postgres.js';
+import { SQLiteStash } from './stash/sqlite.js';
 import { LogStash } from './logstash.js';
+import Os from 'os';
 
 /**
  * Parse request properties to something meaningful
@@ -74,13 +76,24 @@ export class Notice {
  * @returns 
  */
 export function getStashByUrl(url?: string, config?: any): LogStash {
+
     if(!url){
-        throw new Error('Missing database URL');
+        const tmpDir = Os.tmpdir();
+        url = `sqlite://${tmpDir}/logpipe_rl1.sqlite`;
+        console.log(`No database URL provided, using ${url}`);
     }
+
+
     if(url.startsWith('postgresql://')){
         const tableName = config?.tableName ?? 'logpipe_rl1';
         return new PostgresStash(url, tableName);
     }
+
+    if(url.startsWith('sqlite://')){
+        const tableName = config?.tableName ?? 'logpipe_rl1';
+        return new SQLiteStash(url.substring('sqlite://'.length), tableName);
+    }
+
     // TODO: Add support for other databases
     throw new Error('Unsupported database URL');
 }

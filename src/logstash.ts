@@ -2,27 +2,106 @@
  * Stores and retrieves logs
  */
 
-export interface LogStash {
+export abstract class LogStash {
+    private maxLogs: number = -1;
+    private logListeners: Array<(log: Log) => void> = [];
+
     /**
      * Add a log to the store
      * @param log - The log to add
      */
-    addLog(log: Log): Promise<void>;
+    abstract addLog(log: Log): Promise<void>;
     /**
      * Get stored logs based on the filter
      * @param filter - The filter to apply
      */
-    get(filter: LogFilter): Promise<Log[]>;
-    /**
-     * Get stored logs as a stream
-     * @param filter - The filter to apply
-     */
-    getAsStream(filter: LogFilter): Promise<{ stream: AsyncGenerator<Log>, close: () => void }>;
+    abstract get(filter: LogFilter): Promise<Log[]>;
+   
     /**
      * Set the maximum number of logs to store
      * @param maxLogs - The maximum number of logs to store
      */
-    setMaxLogs(maxLogs: number): void;
+    public setMaxLogs(maxLogs: number): void {
+        this.maxLogs = maxLogs;
+    }
+
+    /**
+     * Get the maximum number of logs to store
+     * @returns The maximum number of logs to store
+     */
+    public getMaxLogs(): number {
+        return this.maxLogs;
+    }
+
+    public addLogListener(listener: (log: Log) => void): void {
+        this.logListeners.push(listener);
+    }
+
+    public removeLogListener(listener: (log: Log) => void): void {
+        this.logListeners = this.logListeners.filter((l) => l !== listener);
+    }
+
+    protected onLog(log:Log){
+        this.logListeners.forEach(listener => listener(log));
+    }
+
+     /**
+     * Get stored logs as a stream
+     * @param filter - The filter to apply
+     */
+    public async getAsStream(filter: LogFilter): Promise<{ stream: AsyncGenerator<Log>; close: () => void }> {
+        let closed = false;
+        const queue: Log[] = [];
+        let monitor: any = () => {};
+
+        const listener = (log: Log) => {
+            queue.push(log);
+            monitor();
+        };
+
+        this.addLogListener(listener);
+
+        const close = () => {
+            this.removeLogListener(listener);
+            closed = true;
+        };
+
+        const isFilterMatch = (log: Log, filter: LogFilter): boolean => {
+            if (filter.tags?.length && !filter.tags.some((tag) => log.tags.includes(tag))) {
+                return false;
+            }
+            if (filter.from && log.createdAt < filter.from) {
+                return false;
+            }
+            if (filter.to && log.createdAt > filter.to) {
+                return false;
+            }
+            if (filter.afterId && (log.id == null || log.id <= filter.afterId)) {
+                return false;
+            }
+            return true;
+        };
+
+        const history = await this.get(filter);
+
+        const stream = async function* () {
+            for (const log of history) {
+                yield log;
+            }
+
+            while (!closed) {
+                if (!queue.length) {
+                    await new Promise((resolve) => (monitor = resolve));
+                }
+                const log = queue.shift();
+                if (log && isFilterMatch(log, filter)) {
+                    yield log;
+                }
+            }
+        };
+
+        return { stream: stream(), close };
+    }
 }
 
 

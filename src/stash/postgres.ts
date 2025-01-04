@@ -2,27 +2,22 @@ import { Client, QueryResult } from 'pg';
 import {Log, LogFilter, LogStash} from '../logstash.js'
 
 
-export class PostgresStash implements LogStash {
+export class PostgresStash extends LogStash {
     private readonly client: Client;
     private readonly tableName: string;
-
-    private maxLogs: number = -1;
     private initialized?: Promise<boolean>;
-    private logListeners: Array<(log: Log) => void> = [];
    
     constructor( 
         url: string, 
         table: string,
     ) {
+        super();
         this.tableName = table;
         this.client = new Client({
             connectionString: url,
         });
     }
 
-    public setMaxLogs(maxLogs: number): void {
-        this.maxLogs = maxLogs;
-    }
 
     private async initialize(): Promise<void> {
         if(this.initialized && await this.initialized) return;
@@ -57,9 +52,9 @@ export class PostgresStash implements LogStash {
     public async addLog(log: Log): Promise<void> {
         await this.initialize();
         try {
-            if(this.maxLogs > 0){
+            if(this.getMaxLogs() > 0){
                 const logCount = await this.client.query(`SELECT COUNT(*) FROM ${this.tableName} WHERE logger = $1`, [log.logger]);
-                const numLogsToDelete = (logCount.rows[0].count + 1) - this.maxLogs;
+                const numLogsToDelete = (logCount.rows[0].count + 1) - this.getMaxLogs();
                 if(numLogsToDelete > 0) {
                     console.log(`Deleting ${numLogsToDelete} logs for logger ${log.logger}`);
                     await this.client.query(`
@@ -86,7 +81,8 @@ export class PostgresStash implements LogStash {
                 log.createdAt,
                 log.level
             ]);
-            this.logListeners.forEach(listener => listener(Log.from({...log.toJSON(), id: result.rows[0].id})));
+
+            this.onLog(Log.from({...log.toJSON(), id: result.rows[0].id}));
         } catch (err) {
             console.error(`Error inserting log: ${err}`, log);
             throw err;
@@ -138,64 +134,7 @@ export class PostgresStash implements LogStash {
 
     async getAsStream(filter: LogFilter): Promise<{stream: AsyncGenerator<Log>, close : () => void}> {
         await this.initialize();
-    
-        let closed = false
-       
-
-        const queue:Log[] = [];
-        let monitor:any = () => {}
-
-        const listener = (log:Log) =>{
-            try {
-                queue.push(log);
-                monitor();
-            } catch (err) {
-                console.error(`Error parsing notification payload: ${err}`);
-            }
-        }
-
-        this.logListeners.push(listener);
-        const close = () => {
-            this.logListeners = this.logListeners.filter(l => l !== listener);
-            closed = true;
-        }
-
-        const isFilterMatch = (log: Log, filter: LogFilter): boolean => {
-            if(filter.tags && filter.tags.length && !filter.tags.some(tag => log.tags.includes(tag))){
-                return false;
-            }
-            if(filter.from && log.createdAt < filter.from){
-                return false;
-            }
-            if(filter.to && log.createdAt > filter.to){
-                return false;
-            }
-            if(filter.afterId && (log.id==null || log.id <= filter.afterId)){
-                return false;
-            }
-            return true;
-        }
-        
-        const history:Log[] = await this.get(filter);
-        const stream = async function* () {
-            for(const log of history){
-                yield log;
-            }
-
-            while (!closed) {
-                if(!queue.length){
-                    await new Promise((resolve) => {
-                        monitor = resolve;
-                    });
-                }
-                const log = queue.shift();
-                if(log && isFilterMatch(log, filter)){
-                    yield log;
-                }                              
-            }
-        }
-
-        return {stream: stream(), close};
+        return super.getAsStream(filter);
     }
  
 }
