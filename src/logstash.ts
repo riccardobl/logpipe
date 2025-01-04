@@ -5,18 +5,29 @@
 export abstract class LogStash {
     private maxLogs: number = -1;
     private logListeners: Array<(log: Log) => void> = [];
+    private initialized?: Promise<boolean>;
+
+    
+    /**
+     * Called when the stash is initialized
+     */
+    protected abstract onInitialize(): Promise<void>  
 
     /**
-     * Add a log to the store
-     * @param log - The log to add
+     * Called when logs are requested
+     * @param filter 
      */
-    abstract addLog(log: Log): Promise<void>;
+    protected abstract onGet(filter: LogFilter): Promise<Log[]>;
+
     /**
-     * Get stored logs based on the filter
-     * @param filter - The filter to apply
+     * Called when a log is added
+     * @param log - The log to add
+     * @param maxLogs - The maximum number of logs to store
+     * @returns The id of the added log
      */
-    abstract get(filter: LogFilter): Promise<Log[]>;
-   
+    protected abstract onAdd(log: Log, maxLogs: number): Promise<number>;
+
+    
     /**
      * Set the maximum number of logs to store
      * @param maxLogs - The maximum number of logs to store
@@ -25,31 +36,59 @@ export abstract class LogStash {
         this.maxLogs = maxLogs;
     }
 
+    private async initialize(){
+        if(this.initialized && await this.initialized) return;
+        this.initialized = new Promise(async (resolve, reject) => {
+            try {
+                await this.onInitialize();
+                resolve(true);
+            } catch (err) {
+                console.error(`Error initializing logstash: ${err}`);
+                resolve(false);
+            }
+        });
+        await this.initialized;       
+    }
+ 
+    
     /**
-     * Get the maximum number of logs to store
-     * @returns The maximum number of logs to store
+     * Add a log to the store
+     * @param log - The log to add
      */
-    public getMaxLogs(): number {
-        return this.maxLogs;
+    public async addLog(log: Log): Promise<Log> {
+        await this.initialize();
+        const id = await this.onAdd(log, this.maxLogs);
+        const newLog =  Log.from({...log.toJSON(), id});
+        this.logListeners.forEach(listener => listener(newLog));
+        return newLog
     }
 
-    public addLogListener(listener: (log: Log) => void): void {
+
+    /**
+     * Get stored logs based on the filter
+     * @param filter - The filter to apply
+     */
+    public async get(filter: LogFilter): Promise<Log[]> {
+        await this.initialize();
+        return this.onGet(filter);
+    }
+
+    private addLogListener(listener: (log: Log) => void): void {
         this.logListeners.push(listener);
     }
 
-    public removeLogListener(listener: (log: Log) => void): void {
+    private removeLogListener(listener: (log: Log) => void): void {
         this.logListeners = this.logListeners.filter((l) => l !== listener);
     }
 
-    protected onLog(log:Log){
-        this.logListeners.forEach(listener => listener(log));
-    }
+   
 
      /**
      * Get stored logs as a stream
      * @param filter - The filter to apply
      */
     public async getAsStream(filter: LogFilter): Promise<{ stream: AsyncGenerator<Log>; close: () => void }> {
+        await this.initialize();
         let closed = false;
         const queue: Log[] = [];
         let monitor: any = () => {};

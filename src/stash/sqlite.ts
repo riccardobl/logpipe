@@ -18,7 +18,7 @@ export class SQLiteStash extends LogStash {
         });
     }
 
-    private async initialize(): Promise<void> {
+    protected override async onInitialize(): Promise<void> {
         const createTableQuery = `
             CREATE TABLE IF NOT EXISTS ${this.tableName} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,10 +42,8 @@ export class SQLiteStash extends LogStash {
         });
     }
 
-    public async addLog(log: Log): Promise<void> {
-        await this.initialize();
-
-        if (this.getMaxLogs() > 0) {
+     protected override async onAdd(log: Log, maxLogs:number): Promise<number> {
+        if (maxLogs > 0) {
             const deleteLogsQuery = `
                 DELETE FROM ${this.tableName}
                 WHERE id IN (
@@ -68,7 +66,7 @@ export class SQLiteStash extends LogStash {
                 });
             });
 
-            const numLogsToDelete = logCount + 1 - this.getMaxLogs();
+            const numLogsToDelete = logCount + 1 - maxLogs;
 
             if (numLogsToDelete > 0) {
                 await new Promise<void>((resolve, reject) => {
@@ -89,8 +87,7 @@ export class SQLiteStash extends LogStash {
             VALUES (?, ?, ?, ?, ?);
         `;
 
-        await new Promise<void>((resolve, reject) => {
-            const onLog = (log:Log) => this.onLog(log);
+        const id:number = await new Promise<number>((resolve, reject) => {
             this.db.run(
                 insertLogQuery,
                 [log.logger, log.level, log.message, JSON.stringify(log.tags), log.createdAt],
@@ -99,18 +96,16 @@ export class SQLiteStash extends LogStash {
                         console.error(`Error inserting log: ${err.message}`);
                         reject(err);
                     } else {
-                        const newLog = Log.from({ ...log.toJSON(), id: this.lastID });
-                        onLog(newLog);
-                        resolve();
+                        resolve(this.lastID);
                     }
                 }
             );
         });
+
+        return id;
     }
 
-    public async get(filter: LogFilter): Promise<Log[]> {
-        await this.initialize();
-
+    protected override async onGet(filter: LogFilter): Promise<Log[]> {
         const conditions: string[] = [];
         const values: any[] = [];
 
@@ -157,11 +152,5 @@ export class SQLiteStash extends LogStash {
                 }
             });
         });
-    }
-
-    async getAsStream(filter: LogFilter): Promise<{stream: AsyncGenerator<Log>, close : () => void}> {
-        await this.initialize();
-        return super.getAsStream(filter);
-    }
- 
+    }    
 }
