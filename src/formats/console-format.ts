@@ -63,8 +63,15 @@ export default function (withColors: boolean, debug: boolean): Array<TypeFormatt
                     const colorTags = [...log.tags, log.level];
 
                     let line = "";
-
-                    line += consolify(`[${log.createdAt.toISOString()}] `, ["noise"]);
+                    {
+                        const year = log.createdAt.getFullYear();
+                        const month = ("0" + (log.createdAt.getMonth() + 1)).slice(-2);
+                        const day = ("0" + log.createdAt.getDate()).slice(-2);
+                        const hour = ("0" + log.createdAt.getHours()).slice(-2);
+                        const minute = ("0" + log.createdAt.getMinutes()).slice(-2);
+                        const second = ("0" + log.createdAt.getSeconds()).slice(-2);
+                        line += consolify(`[${year}-${month}-${day} ${hour}:${minute}:${second}] `, ["noise"]);
+                    }
                     line += consolify(`[${log.logger}] `, ["logger"]);
                     line += consolify(`[${log.level.toUpperCase()}] `, ["bold" + log.level, log.level]);
                     line += consolify(`${log.message} `, colorTags);
