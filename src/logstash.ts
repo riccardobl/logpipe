@@ -4,8 +4,20 @@
 
 export abstract class LogStash {
     private maxLogs: number = -1;
-    private logListeners: Array<(log: Log) => void> = [];
+    private logListeners: Array<(log: Log, authKey?: string) => void> = [];
     private initialized?: Promise<boolean>;
+    private readonly authWhitelist: string[];
+
+    constructor(authWhitelist: string[]) {
+        this.authWhitelist = authWhitelist;
+    }
+
+    private checkAuth(authKey?: string): boolean {
+        if (this.authWhitelist.length === 0) return true;
+        if (this.authWhitelist.includes("*")) return true;
+        if (authKey && this.authWhitelist.includes(authKey)) return true;
+        throw new Error("Unauthorized");
+    }
 
     /**
      * Called when the stash is initialized
@@ -16,7 +28,7 @@ export abstract class LogStash {
      * Called when logs are requested
      * @param filter
      */
-    protected abstract onGet(filter: LogFilter): Promise<Log[]>;
+    protected abstract onGet(filter: LogFilter, authKey?: string): Promise<Log[]>;
 
     /**
      * Called when a log is added
@@ -24,7 +36,7 @@ export abstract class LogStash {
      * @param maxLogs - The maximum number of logs to store
      * @returns The id of the added log
      */
-    protected abstract onAdd(log: Log, maxLogs: number): Promise<number>;
+    protected abstract onAdd(log: Log, maxLogs: number, authKey?: string): Promise<number>;
 
     /**
      * Set the maximum number of logs to store
@@ -53,11 +65,12 @@ export abstract class LogStash {
      * Add a log to the store
      * @param log - The log to add
      */
-    public async addLog(log: Log): Promise<Log> {
+    public async addLog(log: Log, authKey?: string): Promise<Log> {
+        await this.checkAuth(authKey);
         await this.initialize();
-        const id = await this.onAdd(log, this.maxLogs);
+        const id = await this.onAdd(log, this.maxLogs, authKey);
         const newLog = Log.from({ ...log.toJSON(), id });
-        this.logListeners.forEach((listener) => listener(newLog));
+        this.logListeners.forEach((listener) => listener(newLog, authKey));
         return newLog;
     }
 
@@ -65,16 +78,17 @@ export abstract class LogStash {
      * Get stored logs based on the filter
      * @param filter - The filter to apply
      */
-    public async get(filter: LogFilter): Promise<Log[]> {
+    public async get(filter: LogFilter, authKey?: string): Promise<Log[]> {
+        await this.checkAuth(authKey);
         await this.initialize();
-        return this.onGet(filter);
+        return this.onGet(filter, authKey);
     }
 
-    private addLogListener(listener: (log: Log) => void): void {
+    private addLogListener(listener: (log: Log, authKey?: string) => void): void {
         this.logListeners.push(listener);
     }
 
-    private removeLogListener(listener: (log: Log) => void): void {
+    private removeLogListener(listener: (log: Log, authKey?: string) => void): void {
         this.logListeners = this.logListeners.filter((l) => l !== listener);
     }
 
@@ -82,13 +96,16 @@ export abstract class LogStash {
      * Get stored logs as a stream
      * @param filter - The filter to apply
      */
-    public async getAsStream(filter: LogFilter): Promise<{ stream: AsyncGenerator<Log>; close: () => void }> {
+    public async getAsStream(filter: LogFilter, authKey?: string): Promise<{ stream: AsyncGenerator<Log>; close: () => void }> {
+        await this.checkAuth(authKey);
         await this.initialize();
         let closed = false;
         const queue: Log[] = [];
         let monitor: any = () => {};
 
-        const listener = (log: Log) => {
+        const listener = (log: Log, _authKey?: string) => {
+            if (closed) return;
+            if (authKey !== _authKey) return;
             queue.push(log);
             monitor();
         };
@@ -116,7 +133,7 @@ export abstract class LogStash {
             return true;
         };
 
-        const history = await this.get(filter);
+        const history = await this.get(filter, authKey);
 
         const stream = async function* () {
             for (const log of history) {
@@ -178,18 +195,18 @@ export class Log {
         const logger = String(data.logger);
         const level = String(data.level);
         const message = String(data.message);
-        
+
         let createdAt = data.createdAt;
-        if(typeof createdAt === 'number'){
-            if(createdAt > 10000000000) {
+        if (typeof createdAt === "number") {
+            if (createdAt > 10000000000) {
                 createdAt = new Date(createdAt);
             } else {
-                createdAt = new Date(createdAt * 1000)
+                createdAt = new Date(createdAt * 1000);
             }
-        }else{
-            createdAt = new Date(createdAt||0);
+        } else {
+            createdAt = new Date(createdAt || 0);
         }
-        
+
         const tags = Array.isArray(data.tags) ? data.tags.map((tag: any) => String(tag)) : [String(data.tags)];
         const id = data.id;
         if (!logger) throw new Error("missing required field: logger");

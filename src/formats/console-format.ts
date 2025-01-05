@@ -23,7 +23,7 @@ const colors: { [key: string]: (value: string) => string } = {
     noise: (value: string) => chalk.white.dim(value),
 };
 
-export default function (withColors: boolean): Array<TypeFormatter> {
+export default function (withColors: boolean, debug: boolean): Array<TypeFormatter> {
     const consolify = (value: string, tags: string[]) => {
         if (!withColors) return value;
         let colorizer: ((value: string) => string) | undefined = undefined;
@@ -43,7 +43,7 @@ export default function (withColors: boolean): Array<TypeFormatter> {
             checker: (value) => typeof value === "object" && value instanceof Error,
             formatter: (value) => {
                 return {
-                    formattedValue: consolify("Error: " + String(value), ["error"]),
+                    formattedValue: consolify("Error: " + String(value.message || (debug ? value : "error")), ["error"]),
                     mimeType: "text/plain",
                 };
             },

@@ -16,9 +16,24 @@ if [ -z "$tags" ]; then
   tags='["test","example"]'
 fi
 
+if [ -z "$LOGPIPE_ENDPOINT" ]; then
+  LOGPIPE_ENDPOINT="http://127.0.0.1:7068"
+fi
+
+if [ -z "$LOGPIPE_FORMAT" ]; then
+  LOGPIPE_FORMAT="cconsole"
+fi
+
+if [ -z "$LOGPIPE_AUTHKEY" ]; then
+  LOGPIPE_AUTHKEY=""
+fi
+
+endpoint="$LOGPIPE_ENDPOINT/write?format=$LOGPIPE_FORMAT&authKey=$LOGPIPE_AUTHKEY"
+
 current_date=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-curl -X POST http://localhost:7068/write?format=console \
+echo "Sending log to $endpoint"
+curl -X POST $endpoint \
      -H "Content-Type: application/json" \
      -d '{
            "logger": "exampleLogger",

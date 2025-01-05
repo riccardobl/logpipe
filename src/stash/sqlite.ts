@@ -5,8 +5,8 @@ export class SQLiteStash extends LogStash {
     private readonly db: sqlite3.Database;
     private readonly tableName: string;
 
-    constructor(filePath: string, table: string) {
-        super();
+    constructor(filePath: string, table: string, authWhitelist: string[]) {
+        super(authWhitelist);
         this.tableName = table;
         this.db = new sqlite3.Database(filePath, (err) => {
             if (err) {
@@ -23,6 +23,7 @@ export class SQLiteStash extends LogStash {
                 logger TEXT NOT NULL,
                 level TEXT NOT NULL,
                 message TEXT NOT NULL,
+                authKey TEXT DEFAULT 'default',
                 tags TEXT,
                 createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
             );
@@ -40,22 +41,22 @@ export class SQLiteStash extends LogStash {
         });
     }
 
-    protected override async onAdd(log: Log, maxLogs: number): Promise<number> {
+    protected override async onAdd(log: Log, maxLogs: number, authKey?: string): Promise<number> {
         if (maxLogs > 0) {
             const deleteLogsQuery = `
                 DELETE FROM ${this.tableName}
                 WHERE id IN (
                     SELECT id FROM ${this.tableName}
-                    WHERE logger = ?
+                    WHERE logger = ? AND authKey = ?
                     ORDER BY createdAt ASC
                     LIMIT ?
                 );
             `;
 
-            const countQuery = `SELECT COUNT(*) as count FROM ${this.tableName} WHERE logger = ?`;
+            const countQuery = `SELECT COUNT(*) as count FROM ${this.tableName} WHERE logger = ? AND authKey = ?;`;
 
             const logCount: number = await new Promise((resolve, reject) => {
-                this.db.get(countQuery, [log.logger], (err, row: { count: number }) => {
+                this.db.get(countQuery, [log.logger, authKey || "public"], (err, row: { count: number }) => {
                     if (err) {
                         reject(err);
                     } else {
@@ -68,7 +69,7 @@ export class SQLiteStash extends LogStash {
 
             if (numLogsToDelete > 0) {
                 await new Promise<void>((resolve, reject) => {
-                    this.db.run(deleteLogsQuery, [log.logger, numLogsToDelete], (err) => {
+                    this.db.run(deleteLogsQuery, [log.logger, numLogsToDelete, authKey || "public"], (err) => {
                         if (err) {
                             console.error(`Error deleting logs: ${err.message}`);
                             reject(err);
@@ -81,12 +82,12 @@ export class SQLiteStash extends LogStash {
         }
 
         const insertLogQuery = `
-            INSERT INTO ${this.tableName} (logger, level, message, tags, createdAt)
-            VALUES (?, ?, ?, ?, ?);
+            INSERT INTO ${this.tableName} (logger, level, message, tags, createdAt, authKey)
+            VALUES (?, ?, ?, ?, ?, ?);
         `;
 
         const id: number = await new Promise<number>((resolve, reject) => {
-            this.db.run(insertLogQuery, [log.logger, log.level, log.message, JSON.stringify(log.tags), log.createdAt.toISOString()], function (err) {
+            this.db.run(insertLogQuery, [log.logger, log.level, log.message, JSON.stringify(log.tags), log.createdAt.toISOString(), authKey || "public"], function (err) {
                 if (err) {
                     console.error(`Error inserting log: ${err.message}`);
                     reject(err);
@@ -99,7 +100,7 @@ export class SQLiteStash extends LogStash {
         return id;
     }
 
-    protected override async onGet(filter: LogFilter): Promise<Log[]> {
+    protected override async onGet(filter: LogFilter, authKey?: string): Promise<Log[]> {
         const conditions: string[] = [];
         const values: any[] = [];
 
@@ -122,6 +123,9 @@ export class SQLiteStash extends LogStash {
             conditions.push(`id > ?`);
             values.push(filter.afterId);
         }
+
+        conditions.push(`authKey = ?`);
+        values.push(authKey || "public");
 
         const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
         const limitClause = `LIMIT ?`;

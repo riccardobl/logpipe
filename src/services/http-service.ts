@@ -26,9 +26,9 @@ export class HttpService implements Service {
 
     private async read(req: Request, res: Response) {
         try {
-            const { tags, format, from, to, limit } = getRequestProps(req.query);
+            const { tags, format, from, to, limit, authKey } = getRequestProps(req.query);
             try {
-                const logs = await this.logs.get({ tags, from, to, limit });
+                const logs = await this.logs.get({ tags, from, to, limit }, authKey);
                 const { formattedValue, mimeType, statusCode } = this.formatter.format(logs, format);
                 res.setHeader("Content-Type", mimeType);
                 res.status(statusCode || 200).send(formattedValue);
@@ -45,21 +45,21 @@ export class HttpService implements Service {
 
     private async write(req: Request, res: Response) {
         try {
+            const reqProps = getRequestProps(req.query);
             try {
                 const body = req.body;
                 const log: Log = Log.from(body);
                 if (new Date().getTime() - log.createdAt.getTime() > 3600000) {
                     throw new Error(`Log is too old`);
                 }
-                await this.logs.addLog(log);
-                const reqProps = getRequestProps(req.query);
+                await this.logs.addLog(log, reqProps.authKey);
 
                 const { formattedValue, mimeType, statusCode } = this.formatter.format(new Notice("Log saved successfully"), reqProps.format);
                 res.setHeader("Content-Type", mimeType);
                 res.status(statusCode || 200).send(formattedValue);
             } catch (err) {
                 console.error(`Error handling /write request: ${err}`);
-                const { formattedValue, mimeType, statusCode } = this.formatter.format(err, "json");
+                const { formattedValue, mimeType, statusCode } = this.formatter.format(err, reqProps.format);
                 res.setHeader("Content-Type", mimeType);
                 res.status(statusCode || 500).send(formattedValue);
             }

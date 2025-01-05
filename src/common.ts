@@ -14,6 +14,7 @@ export function getRequestProps(searchParams: any): {
     from: Date | undefined;
     to: Date | undefined;
     limit: number;
+    authKey?: string;
 } {
     try {
         const tags: string[] = [];
@@ -48,6 +49,10 @@ export function getRequestProps(searchParams: any): {
             out.tags = tags;
         }
 
+        if (searchParams.authKey) {
+            out.authKey = searchParams.authKey;
+        }
+
         return out;
     } catch (err) {
         console.error(`Error parsing request properties: ${err}`);
@@ -76,18 +81,18 @@ export class Notice {
 export function getStashByUrl(url?: string, config?: any): LogStash {
     if (!url) {
         const tmpDir = Os.tmpdir();
-        url = `sqlite://${tmpDir}/logpipe_rl1.sqlite`;
+        url = `sqlite://${tmpDir}/logpipe_rl2.sqlite`;
         console.log(`No database URL provided, using ${url}`);
     }
 
     if (url.startsWith("postgresql://")) {
-        const tableName = config?.tableName ?? "logpipe_rl1";
-        return new PostgresStash(url, tableName);
+        const tableName = config?.tableName ?? "logpipe_rl2";
+        return new PostgresStash(url, tableName, config.authWhitelist || []);
     }
 
     if (url.startsWith("sqlite://")) {
-        const tableName = config?.tableName ?? "logpipe_rl1";
-        return new SQLiteStash(url.substring("sqlite://".length), tableName);
+        const tableName = config?.tableName ?? "logpipe_rl2";
+        return new SQLiteStash(url.substring("sqlite://".length), tableName, config.authWhitelist || []);
     }
 
     // TODO: Add support for other databases

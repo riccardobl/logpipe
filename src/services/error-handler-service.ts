@@ -32,7 +32,7 @@ export class ErrorHandlerService implements Service {
 
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         app.use((req: Request, res: Response, next: any) => {
-            pipeError(new Error('Not found'), req, res);
+            pipeError(new Error("Not found"), req, res);
         });
 
         // eslint-disable-next-line @typescript-eslint/no-unused-vars

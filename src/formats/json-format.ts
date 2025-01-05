@@ -1,6 +1,6 @@
 import { TypeFormatter } from "../formatter.js";
 
-export default function (): Array<TypeFormatter> {
+export default function (debug: boolean): Array<TypeFormatter> {
     return [
         {
             name: "json error formatter",
@@ -10,7 +10,7 @@ export default function (): Array<TypeFormatter> {
                     formattedValue: JSON.stringify({
                         error: String(value),
                         message: value instanceof Error ? value.message : undefined,
-                        stacktrace: process.env.NODE_ENV === "production" ? undefined : value.stack,
+                        stacktrace: !debug ? undefined : value.stack,
                     }),
                     mimeType: "application/json",
                 };

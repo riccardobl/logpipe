@@ -12,13 +12,19 @@ import cors from "cors";
 
 // load config from env
 const config = {
-    databaseUrl: process.env.LOGPIPE_DATABASE_URL || process.env.DATABASE_URL,
+    databaseUrl: process.env.LOGPIPE_DATABASE_URL,
     maxLogs: process.env.LOGPIPE_MAX_LOGS ? parseInt(process.env.LOGPIPE_MAX_LOGS) : 1000,
     defaultFormat: process.env.LOGPIPE_DEFAULT_FORMAT ? process.env.LOGPIPE_DEFAULT_FORMAT : "console",
     host: process.env.LOGPIPE_HOST ? process.env.LOGPIPE_HOST : "0.0.0.0",
     port: process.env.LOGPIPE_PORT ? parseInt(process.env.LOGPIPE_PORT) : 7068,
-    tableName: process.env.LOGPIPE_TABLE ? process.env.LOGPIPE_TABLE : "logpipe_rl1",
+    tableName: process.env.LOGPIPE_TABLE,
+    authWhitelist: process.env.LOGPIPE_AUTH_WHITELIST ? process.env.LOGPIPE_AUTH_WHITELIST.split(",") : [],
+    debug: process.env.LOGPIPE_DEBUG ? process.env.LOGPIPE_DEBUG === "true" : process.env.NODE_ENV === "development",
 };
+
+if (config.debug) {
+    console.log(`Config: ${JSON.stringify(config, null, 2)}`);
+}
 
 // load db
 const stash: LogStash = getStashByUrl(config.databaseUrl, config);
@@ -27,9 +33,9 @@ stash.setMaxLogs(config.maxLogs);
 const formatter: Formatter = new Formatter();
 {
     // load formatter
-    formatter.register("json", JSONFormatter(), config.defaultFormat === "json");
-    formatter.register("console", ConsoleFormatter(false), config.defaultFormat === "console");
-    formatter.register("cconsole", ConsoleFormatter(true), config.defaultFormat === "cconsole");
+    formatter.register("json", JSONFormatter(config.debug), config.defaultFormat === "json");
+    formatter.register("console", ConsoleFormatter(false, config.debug), config.defaultFormat === "console");
+    formatter.register("cconsole", ConsoleFormatter(true, config.debug), config.defaultFormat === "cconsole");
 }
 
 const app = express();

@@ -24,64 +24,76 @@ export class WsService {
     }
 
     private async stream(ws: WebSocket, req: Request) {
-        let reqProps = getRequestProps(req.query);
+        try {
+            let reqProps = getRequestProps(req.query);
 
-        const pipeLogs = async (logs: Log[], reqProps: any) => {
-            const lastId = logs[logs?.length - 1]?.id;
-            if (lastId) reqProps.afterId = lastId;
-            const { formattedValue } = this.formatter.format(logs, reqProps.format);
-            await ws.send(formattedValue);
-        };
+            const pipeLogs = async (logs: Log[], reqProps: any) => {
+                const lastId = logs[logs?.length - 1]?.id;
+                if (lastId) reqProps.afterId = lastId;
+                const { formattedValue } = this.formatter.format(logs, reqProps.format);
+                await ws.send(formattedValue);
+            };
 
-        ws.on("message", async (filter: string) => {
-            try {
-                let newReqProps = {
-                    ...reqProps,
-                };
+            ws.on("message", async (filter: string) => {
                 try {
-                    if (filter) {
-                        let filterProps;
-                        try {
-                            filterProps = getRequestProps(JSON.parse(filter));
-                        } catch {
-                            const rules = filter.split(" ");
-                            const json: any = {};
-                            for (const rule of rules) {
-                                const [key, value] = rule.split("=");
-                                if (!key || !value) throw new Error(`Invalid rule: ${rule}`);
-                                json[key] = value;
+                    let newReqProps = {
+                        ...reqProps,
+                    };
+                    try {
+                        if (filter) {
+                            let filterProps;
+                            try {
+                                filterProps = getRequestProps(JSON.parse(filter));
+                            } catch {
+                                const rules = filter.split(" ");
+                                const json: any = {};
+                                for (const rule of rules) {
+                                    const [key, value] = rule.split("=");
+                                    if (!key || !value) throw new Error(`Invalid rule: ${rule}`);
+                                    json[key] = value;
+                                }
+                                filterProps = getRequestProps(json);
                             }
-                            filterProps = getRequestProps(json);
+                            newReqProps = {
+                                ...newReqProps,
+                                ...filterProps,
+                            };
+                            const { formattedValue } = this.formatter.format(new Notice("Filter applied"), reqProps.format);
+                            ws.send(formattedValue);
                         }
-                        newReqProps = {
-                            ...newReqProps,
-                            ...filterProps,
-                        };
-                        const { formattedValue } = this.formatter.format(new Notice("Filter applied"), reqProps.format);
+                    } catch (err) {
+                        console.error(`Error parsing WebSocket filter: ${err}`);
+                        const { formattedValue } = this.formatter.format(err, reqProps.format);
                         ws.send(formattedValue);
                     }
+                    Object.assign(reqProps, newReqProps);
+
+                    let logs: Log[] = await this.logs.get(reqProps, reqProps.authKey);
+                    if (logs.length) await pipeLogs(logs, reqProps);
                 } catch (err) {
-                    console.error(`Error parsing WebSocket filter: ${err}`);
-                    const { formattedValue } = this.formatter.format(err, reqProps.format);
-                    ws.send(formattedValue);
+                    console.error(`Error handling WebSocket message: ${err}`);
                 }
-                Object.assign(reqProps, newReqProps);
+            });
 
-                let logs: Log[] = await this.logs.get(reqProps);
-                if (logs.length) await pipeLogs(logs, reqProps);
-            } catch (err) {
-                console.error(`Error handling WebSocket message: ${err}`);
+            const { stream, close } = await this.logs.getAsStream(reqProps, reqProps.authKey);
+            ws.on("close", () => {
+                console.log("WebSocket connection closed");
+                close();
+            });
+
+            for await (const log of stream) {
+                await pipeLogs([log], reqProps);
             }
-        });
-
-        const { stream, close } = await this.logs.getAsStream(reqProps);
-        ws.on("close", () => {
-            console.log("WebSocket connection closed");
-            close();
-        });
-
-        for await (const log of stream) {
-            await pipeLogs([log], reqProps);
+        } catch (err) {
+            try {
+                console.error(`Error handling /stream request: ${err}`);
+                const { formattedValue } = this.formatter.format(err, "json");
+                ws.send(formattedValue);
+            } catch (err) {
+                console.error(`Error handling /stream request: ${err}`);
+            } finally {
+                ws.close();
+            }
         }
     }
 }
