@@ -20,7 +20,7 @@ export class ErrorHandlerService implements Service {
                 } catch (e) {
                     console.error(`Error parsing request properties: ${e}`);
                 }
-                const { formattedValue, mimeType, statusCode } = formatter.format(new Error(err.toString), format);
+                const { formattedValue, mimeType, statusCode } = formatter.format(new Error(err.toString()), format);
                 res.setHeader("Content-Type", mimeType);
                 res.status(statusCode || 500).send(formattedValue);
             } catch (e2) {
