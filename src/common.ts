@@ -1,6 +1,6 @@
 import { PostgresStash } from "./stash/postgres.js";
 import { SQLiteStash } from "./stash/sqlite.js";
-import { LogStash } from "./logstash.js";
+import { LogFilter, LogStash } from "./logstash.js";
 import Os from "os";
 
 /**
@@ -8,28 +8,21 @@ import Os from "os";
  * @param searchParams
  * @returns
  */
-export function getRequestProps(searchParams: any): {
-    tags: string[];
+export function getRequestProps(searchParams: any): LogFilter & {
     format: string;
-    from: Date | undefined;
-    to: Date | undefined;
-    limit: number;
     authKey?: string;
 } {
     try {
+        const out = {} as any;
+
         const tags: string[] = [];
-        if (searchParams.tag) {
-            if (Array.isArray(searchParams.tag)) {
-                tags.push(...searchParams.tag.toString());
-            } else {
-                tags.push(searchParams.tag.toString());
+        if (searchParams.filter) {
+            if (searchParams.filter !== "*") {
+                tags.push(...searchParams.filter.toString().split(","));
             }
         }
-        if (searchParams.filter) {
-            tags.push(...searchParams.filter.toString().split(","));
-        }
+        out.tags = tags;
 
-        const out = {} as any;
         if (searchParams.format) {
             out.format = searchParams.format.toString();
         }
@@ -45,12 +38,16 @@ export function getRequestProps(searchParams: any): {
             out.limit = parseInt(String(searchParams.limit));
         }
 
-        if (tags.length) {
-            out.tags = tags;
-        }
-
         if (searchParams.authKey) {
             out.authKey = searchParams.authKey;
+        }
+
+        if (searchParams.afterId) {
+            out.afterId = parseInt(String(searchParams.afterId));
+        }
+
+        if (searchParams.level) {
+            out.level = searchParams.level.toUpperCase();
         }
 
         return out;

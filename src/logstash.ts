@@ -2,6 +2,8 @@
  * Stores and retrieves logs
  */
 
+import { toLogValue } from "./LogLevels";
+
 export abstract class LogStash {
     private maxLogs: number = -1;
     private logListeners: Array<(log: Log, authKey?: string) => void> = [];
@@ -130,6 +132,9 @@ export abstract class LogStash {
             if (filter.afterId && (log.id == null || log.id <= filter.afterId)) {
                 return false;
             }
+            if (filter.level && toLogValue(log.level) > toLogValue(filter.level)) {
+                return false;
+            }
             return true;
         };
 
@@ -161,6 +166,7 @@ export type LogFilter = {
     to?: Date;
     limit?: number;
     afterId?: number;
+    level?: string;
 };
 
 export class Log {

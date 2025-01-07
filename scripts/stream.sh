@@ -12,6 +12,6 @@ if [ -z "$LOGPIPE_AUTHKEY" ]; then
   LOGPIPE_AUTHKEY=""
 fi
 
-endpoint="$LOGPIPE_ENDPOINT/stream?format=$LOGPIPE_FORMAT&authKey=$LOGPIPE_AUTHKEY"
+endpoint="$LOGPIPE_ENDPOINT/stream?format=$LOGPIPE_FORMAT&authKey=$LOGPIPE_AUTHKEY&limit=100"
 echo "Connecting to $endpoint"
 npx wscat --no-color --connect $endpoint

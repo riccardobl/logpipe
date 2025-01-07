@@ -28,8 +28,6 @@ export class WsService {
             let reqProps = getRequestProps(req.query);
 
             const pipeLogs = async (logs: Log[], reqProps: any) => {
-                const lastId = logs[logs?.length - 1]?.id;
-                if (lastId) reqProps.afterId = lastId;
                 const { formattedValue } = this.formatter.format(logs, reqProps.format);
                 await ws.send(formattedValue);
             };

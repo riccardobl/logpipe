@@ -1,6 +1,6 @@
 import sqlite3 from "sqlite3";
 import { Log, LogFilter, LogStash } from "../logstash.js";
-
+import { toLogValue } from "../LogLevels.js";
 export class SQLiteStash extends LogStash {
     private readonly db: sqlite3.Database;
     private readonly tableName: string;
@@ -22,6 +22,7 @@ export class SQLiteStash extends LogStash {
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 logger TEXT NOT NULL,
                 level TEXT NOT NULL,
+                levelValue INTEGER NOT NULL,
                 message TEXT NOT NULL,
                 authKey TEXT DEFAULT 'default',
                 tags TEXT,
@@ -82,19 +83,23 @@ export class SQLiteStash extends LogStash {
         }
 
         const insertLogQuery = `
-            INSERT INTO ${this.tableName} (logger, level, message, tags, createdAt, authKey)
-            VALUES (?, ?, ?, ?, ?, ?);
+            INSERT INTO ${this.tableName} (logger, level, levelValue, message, tags, createdAt, authKey)
+            VALUES (?, ?, ?, ?, ?, ?, ?);
         `;
 
         const id: number = await new Promise<number>((resolve, reject) => {
-            this.db.run(insertLogQuery, [log.logger, log.level, log.message, JSON.stringify(log.tags), log.createdAt.toISOString(), authKey || "public"], function (err) {
-                if (err) {
-                    console.error(`Error inserting log: ${err.message}`);
-                    reject(err);
-                } else {
-                    resolve(this.lastID);
-                }
-            });
+            this.db.run(
+                insertLogQuery,
+                [log.logger, log.level.toUpperCase(), toLogValue(log.level), log.message, JSON.stringify(log.tags), log.createdAt.toISOString(), authKey || "public"],
+                function (err) {
+                    if (err) {
+                        console.error(`Error inserting log: ${err.message}`);
+                        reject(err);
+                    } else {
+                        resolve(this.lastID);
+                    }
+                },
+            );
         });
 
         return id;
@@ -103,7 +108,6 @@ export class SQLiteStash extends LogStash {
     protected override async onGet(filter: LogFilter, authKey?: string): Promise<Log[]> {
         const conditions: string[] = [];
         const values: any[] = [];
-
         if (filter.tags?.length) {
             conditions.push(`tags LIKE ?`);
             values.push(`%${filter.tags.join("%")}%`);
@@ -122,6 +126,14 @@ export class SQLiteStash extends LogStash {
         if (filter.afterId) {
             conditions.push(`id > ?`);
             values.push(filter.afterId);
+        }
+
+        if (filter.level) {
+            const levelNum = toLogValue(filter.level);
+            const levelName = filter.level.toUpperCase();
+            conditions.push(`(level = ? OR levelValue <= ?)`);
+            values.push(levelName);
+            values.push(levelNum);
         }
 
         conditions.push(`authKey = ?`);
