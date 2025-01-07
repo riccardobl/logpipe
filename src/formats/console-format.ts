@@ -80,7 +80,7 @@ export default function (withColors: boolean, debug: boolean): Array<TypeFormatt
                     if (loggerName.length < 16) {
                         loggerName = loggerName.padEnd(16, " ");
                     }
-                    line += colorize(`[${loggerName}]`, ["logger"]);
+                    line += colorizeGroup(`[${loggerName}]`, log.tags);
                     line += colorize(` [${log.level.toUpperCase()}] `, [log.level]);
                     line += colorize(`${log.message} `, [log.level]);
                     line += colorize(log.tags.join(","), ["noise"]);
