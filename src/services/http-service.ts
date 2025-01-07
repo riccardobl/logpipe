@@ -22,8 +22,18 @@ export class HttpService implements Service {
             this.write.bind(this),
         );
         app.get("/read", this.read.bind(this));
+        app.get("health", this.health.bind(this));
     }
 
+    private async health(req: Request, res: Response) {
+        try {
+            res.status(200).send("OK");
+        } catch (err) {
+            console.error(`Error handling /health request: ${err}`);
+            res.status(500).send(`Internal server error`);
+        }
+    }
+    
     private async read(req: Request, res: Response) {
         try {
             const { tags, format, from, to, limit, authKey } = getRequestProps(req.query);
