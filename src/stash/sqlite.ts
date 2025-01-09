@@ -109,8 +109,12 @@ export class SQLiteStash extends LogStash {
         const conditions: string[] = [];
         const values: any[] = [];
         if (filter.tags?.length) {
-            conditions.push(`tags LIKE ?`);
-            values.push(`%${filter.tags.join("%")}%`);
+            const tagConditions = [];
+            for(const tag of filter.tags) {
+                tagConditions.push(`EXISTS (SELECT 1 FROM json_each(tags) WHERE json_each.value = ?)`);
+                values.push(tag);
+            }
+            conditions.push(`(${tagConditions.join(" OR ")})`);
         }
 
         if (filter.from) {
