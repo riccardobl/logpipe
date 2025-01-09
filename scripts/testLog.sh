@@ -16,7 +16,7 @@ if [ -z "$tags" ]; then
   tags='["test","example"]'
 fi
 
-if [ -z "$LOGPIPE_ENDPOINT" ]; then
+if [ -z "$LOGPIPE_ENDPOINT" ] || [ "$LOGPIPE_TEST" -eq 1 ]; then
   LOGPIPE_ENDPOINT="http://127.0.0.1:7068"
 fi
 
@@ -24,7 +24,7 @@ if [ -z "$LOGPIPE_FORMAT" ]; then
   LOGPIPE_FORMAT="cconsole"
 fi
 
-if [ -z "$LOGPIPE_AUTHKEY" ]; then
+if [ -z "$LOGPIPE_AUTHKEY" ] || [ "$LOGPIPE_TEST" -eq 1 ]; then
   LOGPIPE_AUTHKEY=""
 fi
 
