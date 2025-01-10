@@ -43,10 +43,10 @@ export class PostgresStash extends LogStash {
                         WHERE logger = $1
                         AND authKey = $2
                         ORDER BY createdAt ASC
-                        LIMIT $2
+                        LIMIT $3
                     )
                 `,
-                    [log.logger, numLogsToDelete, authKey || "public"],
+                    [log.logger, authKey || "public", numLogsToDelete],
                 );
             }
         }

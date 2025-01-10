@@ -70,7 +70,7 @@ export class SQLiteStash extends LogStash {
 
             if (numLogsToDelete > 0) {
                 await new Promise<void>((resolve, reject) => {
-                    this.db.run(deleteLogsQuery, [log.logger, numLogsToDelete, authKey || "public"], (err) => {
+                    this.db.run(deleteLogsQuery, [log.logger, authKey || "public", numLogsToDelete], (err) => {
                         if (err) {
                             console.error(`Error deleting logs: ${err.message}`);
                             reject(err);
@@ -110,7 +110,7 @@ export class SQLiteStash extends LogStash {
         const values: any[] = [];
         if (filter.tags?.length) {
             const tagConditions = [];
-            for(const tag of filter.tags) {
+            for (const tag of filter.tags) {
                 tagConditions.push(`EXISTS (SELECT 1 FROM json_each(tags) WHERE json_each.value = ?)`);
                 values.push(tag);
             }

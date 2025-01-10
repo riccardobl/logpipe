@@ -33,7 +33,7 @@ export class HttpService implements Service {
             res.status(500).send(`Internal server error`);
         }
     }
-    
+
     private async read(req: Request, res: Response) {
         try {
             const { tags, format, from, to, limit, authKey } = getRequestProps(req.query);
